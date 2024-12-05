@@ -56,7 +56,7 @@ static void async_io_handler(unsigned long  cb_hndl, int err)
 	struct xdma_io_cb *cb = (struct xdma_io_cb *)cb_hndl;
 	struct cdev_async_io *caio = (struct cdev_async_io *)cb->private;
 	ssize_t numbytes = 0;
-	ssize_t res, res2;
+	ssize_t res;
 	int lock_stat;
 	int rv;
 
@@ -88,45 +88,46 @@ static void async_io_handler(unsigned long  cb_hndl, int err)
 	if (!err)
 		numbytes = xdma_xfer_completion((void *)cb, xdev,
 				engine->channel, cb->write, cb->ep_addr,
-				&cb->sgt, 0, 
+				&cb->sgt, 0,
 				cb->write ? h2c_timeout * 1000 :
 					    c2h_timeout * 1000);
 
 	char_sgdma_unmap_user_buf(cb, cb->write);
 
+#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 16, 0)
 	caio->res2 |= (err < 0) ? err : 0;
 	if (caio->res2)
 		caio->err_cnt++;
+#endif
 
 	caio->cmpl_cnt++;
 	caio->res += numbytes;
 
 	if (caio->cmpl_cnt == caio->req_cnt) {
 		res = caio->res;
-		res2 = caio->res2;
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
-    caio->iocb->ki_complete(caio->iocb, res);
+		caio->iocb->ki_complete(caio->iocb, res);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
-    caio->iocb->ki_complete(caio->iocb, res, res2);
+		caio->iocb->ki_complete(caio->iocb, res, caio->res2);
 #else
-    aio_complete(caio->iocb, res, res2);
+		aio_complete(caio->iocb, res, caio->res2);
 #endif
 skip_tran:
 		spin_unlock(&caio->lock);
 		kmem_cache_free(cdev_cache, caio);
 		kfree(cb);
 		return;
-	} 
+	}
 	spin_unlock(&caio->lock);
 	return;
 
 skip_dev_lock:
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 16, 0)
-    caio->iocb->ki_complete(caio->iocb, numbytes);
+	caio->iocb->ki_complete(caio->iocb, numbytes);
 #elif LINUX_VERSION_CODE >= KERNEL_VERSION(4, 1, 0)
-    caio->iocb->ki_complete(caio->iocb, numbytes, -EBUSY);
+	caio->iocb->ki_complete(caio->iocb, numbytes, -EBUSY);
 #else
-    aio_complete(caio->iocb, numbytes, -EBUSY);
+	aio_complete(caio->iocb, numbytes, -EBUSY);
 #endif
 	kmem_cache_free(cdev_cache, caio);
 }
@@ -566,7 +567,7 @@ static ssize_t cdev_aio_read(struct kiocb *iocb, const struct iovec *io,
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 16, 0)
 static ssize_t cdev_write_iter(struct kiocb *iocb, struct iov_iter *io)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return cdev_aio_write(iocb, io->iov, io->nr_segs, io->iov_offset);
 #else
 	return cdev_aio_write(iocb, io->__iov, io->nr_segs, io->iov_offset);
@@ -575,7 +576,7 @@ static ssize_t cdev_write_iter(struct kiocb *iocb, struct iov_iter *io)
 
 static ssize_t cdev_read_iter(struct kiocb *iocb, struct iov_iter *io)
 {
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 10, 0)
 	return cdev_aio_read(iocb, io->iov, io->nr_segs, io->iov_offset);
 #else
 	return cdev_aio_read(iocb, io->__iov, io->nr_segs, io->iov_offset);
@@ -743,6 +744,71 @@ static int ioctl_do_align_get(struct xdma_engine *engine, unsigned long arg)
 	return put_user(engine->addr_align, (int __user *)arg);
 }
 
+
+static int ioctl_do_aperture_dma(struct xdma_engine *engine, unsigned long arg,
+				bool write)
+{
+	struct xdma_aperture_ioctl io;
+	struct xdma_io_cb cb;
+	ssize_t res;
+	int rv;
+
+	rv = copy_from_user(&io, (struct xdma_aperture_ioctl __user *)arg,
+				sizeof(struct xdma_aperture_ioctl));
+	if (rv < 0) {
+		dbg_tfr("%s failed to copy from user space 0x%lx\n",
+			engine->name, arg);
+		return -EINVAL;
+	}
+
+	dbg_tfr("%s, W %d, buf 0x%lx,%lu, ep %llu, aperture %u.\n",
+		engine->name, write, io.buffer, io.len, io.ep_addr,
+		io.aperture);
+
+	if ((write && engine->dir != DMA_TO_DEVICE) ||
+	    (!write && engine->dir != DMA_FROM_DEVICE)) {
+		pr_err("r/w mismatch. W %d, dir %d.\n", write, engine->dir);
+		return -EINVAL;
+	}
+
+	rv = check_transfer_align(engine, (char *)io.buffer, io.len,
+				io.ep_addr, 1);
+	if (rv) {
+		pr_info("Invalid transfer alignment detected\n");
+		return rv;
+	}
+
+	memset(&cb, 0, sizeof(struct xdma_io_cb));
+	cb.buf = (char __user *)io.buffer;
+	cb.len = io.len;
+	cb.ep_addr = io.ep_addr;
+	cb.write = write;
+	rv = char_sgdma_map_user_buf_to_sgl(&cb, write);
+	if (rv < 0)
+		return rv;
+
+	io.error = 0;
+	res = xdma_xfer_aperture(engine, write, io.ep_addr, io.aperture,
+				&cb.sgt, 0, write ? h2c_timeout * 1000 :
+						c2h_timeout * 1000);
+
+	char_sgdma_unmap_user_buf(&cb, write);
+	if (res < 0)
+		io.error = res;
+	else
+		io.done = res;
+
+	rv = copy_to_user((struct xdma_aperture_ioctl __user *)arg, &io,
+				sizeof(struct xdma_aperture_ioctl));
+	if (rv < 0) {
+		dbg_tfr("%s failed to copy to user space 0x%lx, %ld\n",
+			engine->name, arg, res);
+		return -EINVAL;
+	}
+
+	return io.error;
+}
+
 static long char_sgdma_ioctl(struct file *file, unsigned int cmd,
 		unsigned long arg)
 {
@@ -777,6 +843,12 @@ static long char_sgdma_ioctl(struct file *file, unsigned int cmd,
 		break;
 	case IOCTL_XDMA_ALIGN_GET:
 		rv = ioctl_do_align_get(engine, arg);
+		break;
+	case IOCTL_XDMA_APERTURE_R:
+		rv = ioctl_do_aperture_dma(engine, arg, 0);
+		break;
+	case IOCTL_XDMA_APERTURE_W:
+		rv = ioctl_do_aperture_dma(engine, arg, 1);
 		break;
 	default:
 		dbg_perf("Unsupported operation\n");

@@ -189,17 +189,14 @@ long char_ctrl_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
 }
 
 /* maps the PCIe BAR into user space for memory-like access using mmap() */
-// modified LVB 21/2/2021 to mapt to the correct address
-// (physical address is at least 36 bits, and was stored into 32 bit)
-//
 int bridge_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct xdma_dev *xdev;
 	struct xdma_cdev *xcdev = (struct xdma_cdev *)file->private_data;
-	uint64_t off;				// LVB 21/2/2021: must be 64 bit
-	uint64_t phys;				// LVB 21/2/2021: must be 64 bit
-	uint64_t vsize;				// LVB 21/2/2021: must be 64 bit
-	uint64_t psize;				// LVB 21/2/2021: must be 64 bit
+	uint64_t off;
+	uint64_t phys;
+	uint64_t vsize;
+	uint64_t psize;
 	int rv;
 
 	rv = xcdev_check(__func__, xcdev, 0);
@@ -219,8 +216,7 @@ int bridge_mmap(struct file *file, struct vm_area_struct *vma)
 	dbg_sg("mmap(): cdev->bar = %d\n", xcdev->bar);
 	dbg_sg("mmap(): xdev = 0x%p\n", xdev);
 	dbg_sg("mmap(): pci_dev = 0x%08lx\n", (unsigned long)xdev->pdev);
-
-	dbg_sg("off = 0x%lx\n", off);
+	dbg_sg("off = 0x%lx, vsize 0x%lu, psize 0x%lu.\n", off, vsize, psize);
 	dbg_sg("start = 0x%llx\n",
 		(unsigned long long)pci_resource_start(xdev->pdev,
 		xcdev->bar));
@@ -240,7 +236,7 @@ int bridge_mmap(struct file *file, struct vm_area_struct *vma)
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6, 3, 0)
 	vma->vm_flags |= VMEM_FLAGS;
 #else
-	vm_flags_set(vma, VMEM_FLAGS);
+	vma->__vm_flags |= VMEM_FLAGS;
 #endif
 	/* make MMIO accessible to user space */
 	rv = io_remap_pfn_range(vma, vma->vm_start, phys >> PAGE_SHIFT,

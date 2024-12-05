@@ -304,9 +304,7 @@ static int create_xcdev(struct xdma_pci_dev *xpdev, struct xdma_cdev *xcdev,
 	 * do not register yet, create kobjects and name them,
 	 */
 	xcdev->magic = MAGIC_CHAR;
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6, 4, 0)
 	xcdev->cdev.owner = THIS_MODULE;
-#endif
 	xcdev->xpdev = xpdev;
 	xcdev->xdev = xdev;
 	xcdev->engine = engine;
