@@ -103,7 +103,7 @@ void *OutgoingMicSamples(void *arg)
   //
   // open DMA device driver
   //
-    DMAReadfile_fd = open(VMICDMADEVICE, O_RDWR);
+    DMAReadfile_fd = open(VMICDMADEVICE, O_RDONLY);
     if (DMAReadfile_fd < 0)
     {
         printf("XDMA read device open failed for mic data\n");

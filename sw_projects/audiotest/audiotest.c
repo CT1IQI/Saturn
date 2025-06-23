@@ -583,7 +583,7 @@ int main(int argc, char *argv[]) {
         cleanup(&app, &audio);
         return EXIT_FAILURE;
     }
-    audio.dma_write_fd = open("/dev/xdma0_h2c_0", O_RDWR | O_CLOEXEC);
+    audio.dma_write_fd = open("/dev/xdma0_h2c_0", O_WRONLY | O_CLOEXEC);
     if (audio.dma_write_fd < 0) {
         fprintf(stderr, "Failed to open DMA write device: %s\n", strerror(errno));
         cleanup(&app, &audio);
@@ -595,7 +595,7 @@ int main(int argc, char *argv[]) {
         cleanup(&app, &audio);
         return EXIT_FAILURE;
     }
-    audio.dma_read_fd = open("/dev/xdma0_c2h_0", O_RDWR | O_CLOEXEC);
+    audio.dma_read_fd = open("/dev/xdma0_c2h_0", O_RDONLY | O_CLOEXEC);
     if (audio.dma_read_fd < 0) {
         fprintf(stderr, "Failed to open DMA read device: %s\n", strerror(errno));
         cleanup(&app, &audio);

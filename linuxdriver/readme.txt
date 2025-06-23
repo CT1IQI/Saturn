@@ -1,5 +1,4 @@
-These files include two patches to enable operation on a 32 bit or 64 bit RaspberryPi4 Compute Module:
-
+The files in the xdma folder include two patches to enable operation on a 32 bit or 64 bit RaspberryPi4 Compute Module:
 
 1. function "bridge_mmap (cdev_ctrl.c, line 195): 4 variables to become 64 bits
 
@@ -11,8 +10,6 @@ uint64_t off;// LVB 21/2/2021: must be 64 bit
 uint64_t phys;// LVB 21/2/2021: must be 64 bit
 uint64_t vsize;// LVB 21/2/2021: must be 64 bit
 uint64_t psize;// LVB 21/2/2021: must be 64 bit
-
-
 
 2. function set_dma_mask (libxdma.c, line 3881): needs to use 64 bit version for pci_set_consistent_dma_mask()
 
@@ -47,7 +44,6 @@ static int set_dma_mask(struct pci_dev *pdev)
 	return 0;
 }
 
-
 also changes were needed to cdev_xdma.c and libxdma.c to handle changes
 to the linux kernel introduced at V5.18. See:
 
@@ -56,8 +52,6 @@ https://community.element14.com/technologies/fpga-group/b/blog/posts/installing-
 The driver suitable for pre-kernel 5.18 is in folder xdma_pre_kernel_5.18
 
 Thank you to Rick Koch N1GP for improving my fix!
-
-
 
 The files in this directory provide Xilinx PCIe DMA drivers, example software,
 and example test scripts that can be used to exercise the Xilinx PCIe DMA IP.
@@ -72,6 +66,11 @@ Directory and file description:
 
  - xdma_pre_kernel_5.18/: This directory contains the Xilinx PCIe DMA kernel module
        driver files for earlier OS releases
+
+ - xdma_v2: The files in the xdma_v2 folder offer a rewrite of the driver, made by Prandr.
+		(https://github.com/Prandr/dma_ip_drivers  Branch: 'reworked_xdma_main')
+		Some data corruption problems were found with the original driver when used with kernels after v6.13.
+		This rewrite has been tested with kernel 6.15
 
  - include/: This directory contains all include files that are needed for
 	compiling driver.

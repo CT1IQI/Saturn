@@ -89,7 +89,7 @@ void *IncomingDUCIQ(void *arg)                          // listener thread
     //
     // open DMA device driver
     //
-    DMAWritefile_fd = open(VDUCDMADEVICE, O_RDWR);
+    DMAWritefile_fd = open(VDUCDMADEVICE, O_WRONLY);
     if (DMAWritefile_fd < 0)
         printf("XDMA write device open failed for TX I/Q data\n");
         
