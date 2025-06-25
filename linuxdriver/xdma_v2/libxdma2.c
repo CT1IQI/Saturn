@@ -1343,7 +1343,7 @@ static void engine_alignments(struct xdma2_engine *engine)
 	dbg_init("granularity_bytes = %u\n", granularity_bytes);
 	dbg_init("address_bits = %u\n", address_bits);
 /*cast away const just for initialisation)*/
-	if (w) { {
+	if (w) {
 		const_cast(u8, engine->addr_align) = align_bytes;
 		const_cast(u8, engine->len_granularity) = granularity_bytes;
 		const_cast(u8, engine->addr_bits) = address_bits;

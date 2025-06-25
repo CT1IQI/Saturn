@@ -52,21 +52,12 @@ ssize_t read_to_buffer(char *fname, int fd, char *buffer, uint64_t size,
 	while (count < size) {
 		uint64_t bytes = size - count;
 
-		if (bytes > RW_MAX_SIZE)
+		if (bytes > RW_MAX_SIZE) {
 			bytes = RW_MAX_SIZE;
-
-		if (offset) {
-			rc = lseek(fd, offset, SEEK_SET);
-			if (rc != offset) {
-				fprintf(stderr, "%s, seek off 0x%lx != 0x%lx.\n",
-					fname, rc, offset);
-				perror("seek file");
-				return -EIO;
-			}
 		}
 
 		/* read data from file into memory buffer */
-		rc = read(fd, buf, bytes);
+		rc = pread(fd, buf, bytes, offset);
 		if (rc < 0) {
 			fprintf(stderr, "%s, read 0x%lx @ 0x%lx failed %ld.\n",
 				fname, bytes, offset, rc);
@@ -86,9 +77,10 @@ ssize_t read_to_buffer(char *fname, int fd, char *buffer, uint64_t size,
 		loop++;
 	}
 
-	if (count != size && loop)
+	if (count != size && loop) {
 		fprintf(stderr, "%s, read underflow 0x%lx/0x%lx.\n",
 			fname, count, size);
+	}
 	return count;
 }
 
@@ -107,18 +99,8 @@ ssize_t write_from_buffer(char *fname, int fd, char *buffer, uint64_t size,
 		if (bytes > RW_MAX_SIZE)
 			bytes = RW_MAX_SIZE;
 
-		if (offset) {
-			rc = lseek(fd, offset, SEEK_SET);
-			if (rc != offset) {
-				fprintf(stderr, "%s, seek off 0x%lx != 0x%lx.\n",
-					fname, rc, offset);
-				perror("seek file");
-				return -EIO;
-			}
-		}
-
 		/* write data to file from memory buffer */
-		rc = write(fd, buf, bytes);
+		rc = pwrite(fd, buf, bytes, offset);
 		if (rc < 0) {
 			fprintf(stderr, "%s, write 0x%lx @ 0x%lx failed %ld.\n",
 				fname, bytes, offset, rc);

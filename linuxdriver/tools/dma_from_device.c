@@ -193,9 +193,9 @@ static int test_dma(char *devname, uint64_t addr, uint64_t aperture,
 	 * EOP (end-of-packet), streaming mode only
 	 */
 	if (eop_flush)
-		fpga_fd = open(devname, O_RDWR | O_TRUNC);
+		fpga_fd = open(devname, O_RDONLY | O_TRUNC);
 	else
-		fpga_fd = open(devname, O_RDWR);
+		fpga_fd = open(devname, O_RDONLY);
 
 	if (fpga_fd < 0) {
                 fprintf(stderr, "unable to open device %s, %d.\n",

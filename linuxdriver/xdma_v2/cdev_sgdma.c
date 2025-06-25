@@ -165,9 +165,9 @@ static int ioctl_do_submit_transfer(struct xdma2_engine *engine, unsigned long a
 	}
 	
 	/*to verify user intention, otherwise not really necessary*/
-	if (!((transfer_mode==XDMA2_H2C)&& (engine->dir==DMA_TO_DEVICE)) && 
-		!((transfer_mode==XDMA2_C2H) && (engine->dir==DMA_FROM_DEVICE))) {
-		pr_err("Improper XDMA2 transfer mode\n");
+	if (!((transfer_mode==XDMA_H2C) && (engine->dir==DMA_TO_DEVICE)) && 
+		!((transfer_mode==XDMA_C2H) && (engine->dir==DMA_FROM_DEVICE))) {
+		pr_err("Improper XDMA transfer mode\n");
 		return -ENOTSUPP;
 	}
 		
@@ -200,7 +200,7 @@ static int ioctl_do_submit_transfer(struct xdma2_engine *engine, unsigned long a
 		}
 	}
 #ifdef __LIBXDMA2_DEBUG__
-	engine->transfer_params.dir= (transfer_mode==XDMA2_H2C) ? DMA_TO_DEVICE: DMA_FROM_DEVICE;
+	engine->transfer_params.dir= (transfer_mode==XDMA_H2C) ? DMA_TO_DEVICE: DMA_FROM_DEVICE;
 #endif
 	transfer_res=xdma2_xfer_submit(engine);
 	
@@ -212,7 +212,7 @@ static int ioctl_do_submit_transfer(struct xdma2_engine *engine, unsigned long a
 		rv= (int) transfer_res;
 	} else {
 		rv=__put_user(transfer_res, &(user_transfer_request->length));
-		if ( {unlikely(rv<0))
+		if (unlikely(rv<0)) {
 			goto exit;
 		}
 		rv=0;
@@ -283,7 +283,7 @@ static int char_sgdma_open(struct inode *inode, struct file *filp)
 	
 	/*Should never ever happen otherwise something went horribly wrong*/
 	xdma2_debug_assert_msg((engine->dir==DMA_TO_DEVICE)||(engine->dir==DMA_FROM_DEVICE), 
-		"Unexpected direction of XDMA2 engine", -ENODEV);
+		"Unexpected direction of XDMA engine", -ENODEV);
 
 	/* make sure that file access mode matches direction of engine and otherwise deny access  */
 	if (engine->dir==DMA_TO_DEVICE) {

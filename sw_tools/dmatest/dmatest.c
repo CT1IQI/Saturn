@@ -41,8 +41,6 @@
 void CreateTestData(char* MemPtr, uint32_t Size)
 {
 	uint16_t* Data;						// ptr to memory block to write data
-	uint16_t Word;						// a word of write data
-
 	uint32_t Cntr;						// memory counter
 
 	Data = (uint16_t *) MemPtr;
@@ -57,9 +55,8 @@ void CreateTestData(char* MemPtr, uint32_t Size)
 //
 void DumpMemoryBuffer(char* MemPtr, uint32_t Length)
 {
-	unsigned char Byte;
 	uint32_t ByteCntr;
-  uint32_t RowCntr;
+	uint32_t RowCntr;
 
 	for (RowCntr=0; RowCntr < Length/16; RowCntr++)
 	{
@@ -132,7 +129,7 @@ int DMAWriteToFPGA(int fd, char*SrcData, uint32_t Length, uint32_t AXIAddr)
 	rc = write(fd, SrcData, Length);
 	if (rc < 0)
 	{
-		printf("write 0x%lx @ 0x%lx failed %ld.\n", Length, OffsetAddr, rc);
+		printf("write 0x%x @ 0x%lx failed %ld.\n", Length, OffsetAddr, rc);
 		perror("DMA write");
 		return -EIO;
 	}
@@ -165,7 +162,7 @@ int DMAReadFromFPGA(int fd, char*DestData, uint32_t Length, uint32_t AXIAddr)
 	rc = read(fd, DestData, Length);
 	if (rc < 0)
 	{
-		printf("read 0x%lx @ 0x%lx failed %ld.\n", Length, OffsetAddr, rc);
+		printf("read 0x%x @ 0x%lx failed %ld.\n", Length, OffsetAddr, rc);
 		perror("DMA read");
 		return -EIO;
 	}
@@ -177,8 +174,10 @@ uint32_t RegisterRead(uint32_t Address)
 	uint32_t result = 0;
 
     ssize_t nread = pread(register_fd, &result, sizeof(result), (off_t) Address);
-    if (nread != sizeof(result))
+    if (nread != sizeof(result)) {
         printf("ERROR: register read: addr=0x%08X   error=%s\n",Address, strerror(errno));
+	}
+	
 	return result;
 }
 

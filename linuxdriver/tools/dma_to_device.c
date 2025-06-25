@@ -185,7 +185,7 @@ static int test_dma(char *devname, uint64_t addr, uint64_t aperture,
 	struct timespec ts_start, ts_end;
 	int infile_fd = -1;
 	int outfile_fd = -1;
-	int fpga_fd = open(devname, O_RDWR);
+	int fpga_fd = open(devname, O_WRONLY);
 	long total_time = 0;
 	float result;
 	float avg_time = 0;
@@ -199,7 +199,7 @@ static int test_dma(char *devname, uint64_t addr, uint64_t aperture,
 	}
 
 	if (infname) {
-		infile_fd = open(infname, O_RDONLY);
+		infile_fd = open(infname, O_RDWR);
 		if (infile_fd < 0) {
 			fprintf(stderr, "unable to open input file %s, %d.\n",
 				infname, infile_fd);

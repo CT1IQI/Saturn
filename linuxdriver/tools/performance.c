@@ -73,7 +73,7 @@ static int verbosity = 0;
 int main(int argc, char *argv[])
 {
   int cmd_opt;
-  char *device = "/dev/xdma/card0/h2c0";
+  char *device = "/dev/xdma0_h2c_0";
   uint32_t size = 32768;
   uint32_t count = 1;
   char *filename = NULL;
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
 int test_dma(char *device_name, int size, int count)
 {
   int rc = 0;
-  int fd = open(device_name, O_RDWR);
+  int fd = open(device_name, O_WRONLY);
   if (fd < 0) {
 	  printf("FAILURE: Could not open %s. Make sure xdma device driver is loaded and you have access rights (maybe use sudo?).\n", device_name);
 	  exit(1);

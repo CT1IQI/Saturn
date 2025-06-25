@@ -35,14 +35,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define VTRANSFERSIZE 4096										// size in bytes to DMA transfer
-#define VMEMBUFFERSIZE 32768									// memory buffer to reserve
-#define AXIBaseAddress 0x18000									// address of StreamRead/Writer IP
+#define VTRANSFERSIZE 4096						// size in bytes to DMA transfer
+#define VMEMBUFFERSIZE 32768					// memory buffer to reserve
+#define AXIBaseAddress 0x00000 // 0x18000					// address of StreamRead/Writer IP
 
 //
 // mem read/write variables:
 //
-	int register_fd;                             // device identifier
+	int register_fd;                            // device identifier
 
 
 //
@@ -51,9 +51,9 @@
 //
 void DumpMemoryBuffer(char* MemPtr, uint32_t Length)
 {
-	unsigned char Byte;
+
 	uint32_t ByteCntr;
-  uint32_t RowCntr;
+	uint32_t RowCntr;
 
 	for (RowCntr=0; RowCntr < Length/16; RowCntr++)
 	{
@@ -64,10 +64,6 @@ void DumpMemoryBuffer(char* MemPtr, uint32_t Length)
 	}
 }
 
-
-
-
-
 //
 // initiate a DMA from the FPGA with specified parameters
 // returns 1 if success, else 0
@@ -76,40 +72,32 @@ void DumpMemoryBuffer(char* MemPtr, uint32_t Length)
 // Length: number of bytes to copy
 // AXIAddr: offset address in the FPGA window 
 //
-int DMAReadFromFPGA(int fd, char*DestData, uint32_t Length, uint32_t AXIAddr)
+int DMAReadFromFPGA(int fd, unsigned char* DestData, uint32_t Length, uint32_t AXIAddr)
 {
 	ssize_t rc;									// response code
 	off_t OffsetAddr;
 
 	OffsetAddr = AXIAddr;
-	rc = lseek(fd, OffsetAddr, SEEK_SET);
-	if (rc != OffsetAddr)
-	{
-		printf("seek off 0x%lx != 0x%lx.\n", rc, OffsetAddr);
-		perror("seek file");
-		return -EIO;
-	}
 
-	// write data to FPGA from memory buffer
-	rc = read(fd, DestData, Length);
+	// read data from FPGA to memory buffer
+	rc = pread(fd, DestData, Length, OffsetAddr);
 	if (rc < 0)
 	{
-		printf("read 0x%lx @ 0x%lx failed %ld.\n", Length, OffsetAddr, rc);
+		printf("read 0x%x @ 0x%lx failed %ld.\n", Length, OffsetAddr, rc);
 		perror("DMA read");
 		return -EIO;
 	}
 	return 0;
 }
 
-
-
 uint32_t RegisterRead(uint32_t Address)
 {
 	uint32_t result = 0;
 
     ssize_t nread = pread(register_fd, &result, sizeof(result), (off_t) Address);
-    if (nread != sizeof(result))
+    if (nread != sizeof(result)) {
         printf("ERROR: register read: addr=0x%08X   error=%s\n",Address, strerror(errno));
+	}
 	return result;
 }
 
@@ -124,9 +112,8 @@ void RegisterWrite(uint32_t Address, uint32_t Data)
         printf("ERROR: Write: addr=0x%08X   error=%s\n",Address, strerror(errno));
 }
 
-
-#define VCSVCOUNT 83					// 83 I/Q pairs similar to one USB frame
-#define VPACKETSIZE VCSVCOUNT*6			// number of bytes needed for one CSV record
+#define VCSVCOUNT 83							// 83 I/Q pairs similar to one USB frame
+#define VPACKETSIZE VCSVCOUNT*6					// number of bytes needed for one CSV record
 //
 // write a packet of data to CSV; 
 // sending <VCSVCOUNT> I/Q pairs. This is similar to a USB frame.
@@ -151,19 +138,16 @@ unsigned char * CSVWrite(FILE* fd, unsigned char* Ptr, uint32_t* Counter)
 	return Ptr;
 }
 
-
-
-
 #define VALIGNMENT 4096
-#define VBASE 0x1000									// DMA start at 4K into buffer
+#define VBASE 0x1000							// DMA start at 4K into buffer
 
 //
 // main program
 //
-int main(int argc, char *argv[])
+int main()
 {
-	int DMAReadfile_fd = -1;											// DMA read file device
-  	char* ReadBuffer = NULL;											// data for DMA write
+	int DMAReadfile_fd = -1;					// DMA read file device
+  	unsigned char* ReadBuffer = NULL;			// data for DMA write
 	uint32_t BufferSize = 32768;
 
 	uint32_t RegisterValue;
@@ -171,11 +155,9 @@ int main(int argc, char *argv[])
 	FILE *fp;
 	uint32_t SampleCounter = 0;
 
-	uint32_t Head = 0;											// byte address of 1st free location
-	uint32_t Read = 0;											// read point in buffer
-	unsigned char* ReadPtr;									// pointer for reading out an I or Q sample
-	unsigned char* HeadPtr;									// ptr to 1st free location
-	unsigned char* BasePtr;									// ptr to DMA location
+	unsigned char* ReadPtr;						// pointer for reading out an I or Q sample
+	unsigned char* HeadPtr;						// ptr to 1st free location
+	unsigned char* BasePtr;						// ptr to DMA location
 	uint32_t ResidueBytes;
 //
 // initialise. Create memory buffers and open DMA file devices
@@ -186,7 +168,7 @@ int main(int argc, char *argv[])
 		printf("read buffer allocation failed\n");
 		goto out;
 	}
-	ReadPtr = ReadBuffer + VBASE;							// offset 4096 bytes into buffer
+	ReadPtr = ReadBuffer + VBASE;				// offset 4096 bytes into buffer
 	HeadPtr = ReadBuffer + VBASE;
 	BasePtr = ReadBuffer + VBASE;
 
@@ -213,33 +195,35 @@ int main(int argc, char *argv[])
 //
 // open CSV file
 //
-	fp = fopen("sine.csv", "w");
+	fp = fopen("/tmp/sine.csv", "w");
 
 //
 // now read the user access register (it should have a date code)
 //
-	RegisterValue = RegisterRead(0xB000);				// read the user access register
+	RegisterValue = RegisterRead(0x4004);		// read the user access register
 	printf("User register = %08x\n", RegisterValue);
 
 //
 // write 0 to GPIO to clear FIFO
 //
-	RegisterWrite(0xA000, 0);				// write to the GPIO register
-	RegisterWrite(0xA000, 2);				// write to the GPIO register
+	RegisterWrite(0x7000, 0);					// write to the GPIO register
+	RegisterWrite(0x7000, 2);					// write to the GPIO register
 	printf("GPIO Register written with value=0 then 2 to reset FIFO\n");
 //
 // read the FIFO depth register (it should be 0)
 //
-	RegisterValue = RegisterRead(0x9000);				// read the FIFO Depth register
+	RegisterValue = RegisterRead(0x9000);		// read the FIFO Depth register
 	printf("FIFO Depth register = %08x (should be 0)\n", RegisterValue);
 	Depth=0;
 
 //
 // write 3 to GPIO to enable FIFO writes
 //
-	RegisterWrite(0xA000, 3);				// write to the GPIO register
+	RegisterWrite(0x7000, 3);					// write to the GPIO register
 	printf("GPIO Register written with value=3, enabling writes\n");
 
+//	fclose(fp);
+//	goto out;
 //
 // now read and dump data until we have at least 10000 samples
 //
@@ -266,12 +250,12 @@ int main(int argc, char *argv[])
 //
 // now wait until there is data, then DMA it
 //
-		Depth = RegisterRead(0x9000);				// read the user access register
+		Depth = RegisterRead(0x9000);			// read the user access register
 		printf("read: depth = %d\n", Depth);
-		while(Depth < 512)			// 512 locations = 4K bytes
+		while(Depth < 512)						// 512 locations = 4K bytes
 		{
-			usleep(1000);								// 1ms wait
-			Depth = RegisterRead(0x9000);				// read the user access register
+			usleep(1000);						// 1ms wait
+			Depth = RegisterRead(0x9000);		// read the user access register
 			printf("read: depth = %d\n", Depth);
 		}
 
@@ -284,18 +268,15 @@ int main(int argc, char *argv[])
 	//
 	// Disable write, Do a DMA read, then re-read depth register
 	//
-		RegisterWrite(0xA000, 2);				// write to the GPIO register
+		RegisterWrite(0x7000, 2);				// write to the GPIO register
 		printf("GPIO Register written with value=2\n");//
 	//
 	// read the FIFO depth register
 	//
-		RegisterValue = RegisterRead(0x9000);				// read the FIFO Depth register
+		RegisterValue = RegisterRead(0x9000);	// read the FIFO Depth register
 		printf("FIFO Depth register at end after multiple DMA transfers = %d\n", RegisterValue);
 
 	fclose(fp);
-
-
-
 //
 // close down. Deallocate memory and close files
 //
